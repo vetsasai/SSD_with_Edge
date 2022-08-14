@@ -1,0 +1,25 @@
+train_transform = transforms.Compose([
+    transforms.ToTensor(),
+    transforms.Resize((300, 300)),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+])
+
+dataset = DatasetSSDTrain(
+    "F:\project folder\Car_LicensePlate_Dataset",
+    default_boxes_xywh=default_boxes_xywh,
+    default_boxes_xyxy=default_boxes_xyxy,
+    transform=train_transform
+)
+
+# spliting the dataset
+
+train_set, test_Set = torch.utils.data.random_split(dataset, [500,206])
+
+# train loader and test loader
+
+train_loader = torch.utils.data.DataLoader(
+    train_set, batch_size=10, shuffle=True, num_workers=0
+)
+test_loader=torch.utils.data.DataLoader(
+    test_Set, batch_size=1, shuffle=True, num_workers=0
+)
