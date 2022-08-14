@@ -1,0 +1,31 @@
+class Auxilarylayers(nn.Module):
+    def __init__(self):
+        super(Auxilarylayers,self).__init__()
+        self.conv16 =nn.Conv2d(1024,256,kernel_size=1,padding=0)
+        self.conv17 =nn.Conv2d(256,512,kernel_size=3,stride=2,padding=1)
+        
+        self.conv18 =nn.Conv2d(512,128,kernel_size=1,padding=0)
+        self.conv19 =nn.Conv2d(128,256,kernel_size=3,stride=2,padding=1)
+        
+        self.conv20 =nn.Conv2d(256,128,kernel_size=1,padding=0)
+        self.conv21 =nn.Conv2d(128,256,kernel_size=3,padding=0)
+        
+        self.conv22 =nn.Conv2d(256,128,kernel_size=1,padding=0)
+        self.conv23 =nn.Conv2d(128,256,kernel_size=3,padding=0)
+
+    def forward(self,head2):
+        x =F.relu(self.conv16(head2))
+        x =F.relu(self.conv17(x))
+        head3=x
+        x =F.relu(self.conv18(x))
+        x =F.relu(self.conv19(x))
+        head4=x
+        x =F.relu(self.conv20(x))
+        x =F.relu(self.conv21(x))
+        head5=x
+        x =F.relu(self.conv22(x))
+        x =F.relu(self.conv23(x))
+        head6=x
+        
+        return head3,head4,head5,head6
+  
