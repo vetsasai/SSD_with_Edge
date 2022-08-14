@@ -1,0 +1,131 @@
+lowest_loss = None
+init_epoch = 0
+LOAD_PRETRAINED_MODEL =True
+if LOAD_PRETRAINED_MODEL:
+    model_path = "E:\model_scripted.pt"
+    model = torch.jit.load(model_path)
+
+model.eval()
+dataset_loader = torch.utils.data.DataLoader(
+    dataset, batch_size=1, shuffle=False, num_workers=0
+)
+
+# idx = 0
+running_loss = 0
+for input_tensor, target_boxes, target_classes in (dataset_loader):
+    # idx += 1
+    # if idx < 87:
+    #     continue
+    
+    input_tensor = input_tensor.float().to(device)
+    target_boxes = target_boxes.float().to(device)
+    target_classes = target_classes.to(device, dtype=torch.long)
+    
+
+        
+        
+    with torch.no_grad():
+        output_boxes, output_classes = model(input_tensor)
+
+        loss = compute_loss(output_classes, target_classes, output_boxes, target_boxes, device)
+        running_loss += loss.item() / 1.0
+
+    break
+
+print("epoch", init_epoch,
+      '; Loss: ', running_loss)
+      
+      
+      
+out_preds, out_class = F.softmax(output_classes, dim=2).squeeze(0).max(1)
+# out_class = output_classes.squeeze(0).max(1).detach().cpu().numpy()
+
+out_preds = out_preds.detach().cpu().numpy()
+out_class = out_class.detach().cpu().numpy()
+out_boxes = output_boxes.squeeze(0).detach().cpu().numpy()
+
+print(out_class.shape)
+plt.plot(out_preds[out_class != 0],'.')
+plt.show()
+
+
+img_draw = np.clip((input_tensor[0].permute(1, 2, 0).detach().cpu().numpy() * 255),0, 255).astype(np.uint8).copy(order='C')
+
+# img_draw = np.zeros(img_draw.shape, dtype=np.uint8)
+# print(img_draw.shape)
+#out_preds, out_class
+
+for box_id in range(default_boxes_xywh.shape[0]):
+
+    if int(out_class[box_id]) != 2 or out_preds[box_id] < 0.9:
+        continue
+    
+    Bx, By, Bw, Bh = out_boxes[box_id, :]
+    Dx, Dy, Dw, Dh = default_boxes_xywh[box_id, :]    
+    bx = Dx + Dw * Bx
+    by = Dy + Dh * By
+    bw = Dw * np.exp(Bw)
+    bh = Dh * np.exp(Bh)
+
+    x1, y1, x2, y2 = convert_xywh_to_xyxy(bx, by, bw, bh)
+    x1, y1, x2, y2 = convert_normalized_to_xyxy(x1, y1, x2, y2, img_draw.shape[1], img_draw.shape[0])
+    cv2.rectangle(img_draw, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 1)
+    
+plt.figure(figsize=(10,10))
+plt.imshow(img_draw[:,:,::-1])
+plt.show()
+
+
+
+#nms
+final_bboxes = list()
+
+for class_id in [1, 2]:
+    mask = (out_class == class_id) * (out_preds > 0.999)
+    if np.sum(mask) > 0:
+        sel_boxes, sel_preds, sel_default_boxes = out_boxes[mask, :][:], out_preds[mask][:], default_boxes_xywh[mask, :][:]
+        sort_index = np.argsort(sel_preds)[::-1]
+        sel_boxes = sel_boxes[sort_index]
+        sel_preds = sel_preds[sort_index]
+        sel_default_boxes = sel_default_boxes[sort_index]
+        
+        # convert all offsets to bbox_xyxy
+        
+        for box_id in range(sel_boxes.shape[0]):
+            Bx, By, Bw, Bh = sel_boxes[box_id, :]
+            Dx, Dy, Dw, Dh = sel_default_boxes[box_id, :]    
+            bx = Dx + Dw * Bx
+            by = Dy + Dh * By
+            bw = Dw * np.exp(Bw)
+            bh = Dh * np.exp(Bh)
+            x1_min, y1_min, x1_max, y1_max = convert_xywh_to_xyxy(bx, by, bw, bh)
+            sel_boxes[box_id, :] = x1_min, y1_min, x1_max, y1_max
+        
+        while sel_preds.shape[0] > 0:
+            # print(sel_preds.shape[0])
+            
+            # get current bbox
+            x1_min, y1_min, x1_max, y1_max = sel_boxes[0, :]
+            final_bboxes.append((x1_min, y1_min, x1_max, y1_max))
+            
+            iou = np_calc_iou((x1_min, y1_min, x1_max, y1_max), sel_boxes)
+            mask_iou_high = iou < 0.1
+            
+            sel_boxes = sel_boxes[mask_iou_high]
+            sel_preds = sel_preds[mask_iou_high]
+            
+
+print(len(final_bboxes))
+print(sel_preds)
+
+
+img_draw = np.clip((input_tensor[0].squeeze(0).permute(1, 2, 0).detach().cpu().numpy() * 255),0, 255).astype(np.uint8).copy(order='C')
+
+for x1, y1, x2, y2 in final_bboxes:
+
+    x1, y1, x2, y2 = convert_normalized_to_xyxy(x1, y1, x2, y2, img_draw.shape[1], img_draw.shape[0])
+    cv2.rectangle(img_draw, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 1)
+    #cv2.putText(img_draw,"car'",(int(x1), int(y1)-10),cv2.FONT_HERSHEY_COMPLEX,0.9,(0,255,0),1)
+plt.figure(figsize=(10,10))
+plt.imshow(img_draw[:,:,::-1])
+plt.show()
