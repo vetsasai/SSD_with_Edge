@@ -1,0 +1,79 @@
+class Predection(nn.Module):
+    def __init__(self,classes):
+        super(Predection,self).__init__()
+        self.classes=classes
+        self.Head1=nn.Conv2d(512,4*4,kernel_size=3, padding=1)
+        self.Head2=nn.Conv2d(1024,6*4,kernel_size=3, padding=1)
+        self.Head3=nn.Conv2d(512,6*4,kernel_size=3, padding=1)
+        self.Head4=nn.Conv2d(256,6*4,kernel_size=3, padding=1)
+        self.Head5=nn.Conv2d(256,4*4,kernel_size=3, padding=1)
+        self.Head6=nn.Conv2d(256,4*4,kernel_size=3, padding=1)
+        
+        self.class1=  nn.Conv2d(512,  4 * classes, kernel_size=3, padding=1)
+        self.class2=  nn.Conv2d(1024, 6 * classes, kernel_size=3, padding=1)
+        self.class3 = nn.Conv2d(512,  6 * classes, kernel_size=3, padding=1)
+        self.class4 = nn.Conv2d(256,  6 * classes, kernel_size=3, padding=1)
+        self.class5 = nn.Conv2d(256,  4 * classes, kernel_size=3, padding=1)
+        self.class6 = nn.Conv2d(256,  4 * classes, kernel_size=3, padding=1)
+
+    def forward(self,head1,head2,head3,head4,head5,head6):
+        #size=head1.size(0)
+        box1=self.Head1(head1)
+        box1=box1.permute(0,2,3,1).contiguous()
+        box1=box1.view(box1.size(0),-1,4)
+        
+        
+        class1 = self.class1(head1)
+        class1 = class1.permute(0, 2, 3, 1).contiguous()
+        class1 = class1.view(class1.size(0),-1,self.classes)
+        
+        
+        
+        box2=self.Head2(head2)
+        box2=box2.permute(0,2,3,1).contiguous()
+        box2=box2.view(box2.size(0),-1,4)
+        
+        class2 = self.class2(head2)
+        class2 = class2.permute(0, 2, 3, 1).contiguous()
+        class2 = class2.view(class2.size(0),-1,self.classes)
+        
+        box3=self.Head3(head3)
+        box3=box3.permute(0,2,3,1).contiguous()
+        box3=box3.reshape(box3.size(0),-1,4)
+        
+        class3 = self.class3(head3)
+        class3 = class3.permute(0, 2, 3, 1).contiguous()
+        class3 = class3.view(class3.size(0),-1,self.classes)
+        
+        box4=self.Head4(head4)
+        box4=box4.permute(0,2,3,1).contiguous()
+        box4=box4.view(box4.size(0),-1,4)
+        
+        
+        class4 = self.class4(head4)
+        class4 = class4.permute(0, 2, 3, 1).contiguous()
+        class4 = class4.view(class4.size(0),-1,self.classes)
+        
+        box5=self.Head5(head5)
+        box5=box5.permute(0,2,3,1).contiguous()
+        box5=box5.view(box5.size(0),-1,4)
+        
+        
+        class5 = self.class5(head5)
+        class5 = class5.permute(0, 2, 3, 1).contiguous()
+        class5 = class5.view(class5.size(0),-1,self.classes)
+        
+        
+        box6=self.Head6(head6)
+        box6=box6.permute(0,2,3,1).contiguous()
+        box6=box6.view(box6.size(0),-1,4)
+        
+        
+        class6 = self.class6(head6)
+        class6 = class6.permute(0, 2, 3, 1).contiguous()
+        class6 = class6.view(class6.size(0),-1,self.classes)
+        
+        
+        boxes=torch.cat([box1,box2,box3,box4,box5,box6],dim=1)
+        classess=torch.cat([class1,class2,class3,class4,class5,class6],dim=1)
+        return boxes,classess
