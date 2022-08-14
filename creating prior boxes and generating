@@ -1,0 +1,76 @@
+from typing import List, Tuple
+
+def create_default_boxes(
+    image_size: Tuple[int, int],                 # target image dimension [height, width]
+    grid_sizes: List[Tuple[int, int]],           # [(grid1.dim0, grid1.dim0), (grid2.dim0, grid2.dim1)]
+    anchors_sizes: List[List[Tuple[float, float]]],     # [(box1.width, box1.height), (box2.width, box2.height)]
+    normalize: bool = True
+) -> Tuple[List[Tuple[float, float, float, float]],  # boxes_xyxy
+           List[Tuple[float, float, float, float]],  # boxes_xywh
+           List[Tuple[float, float, float, float]]]:  # boxes_cxcywh
+
+    image_height, image_width = image_size[:2]
+
+    boxes_xyxy = list()
+    boxes_xywh = list()
+    boxes_cxcywh = list()
+    
+    grid_idx = 0
+    for grid_dim0, grid_dim1 in grid_sizes:
+        grid_size_dim0 = image_height / float(grid_dim0)
+        grid_size_dim1 = image_width / float(grid_dim1)
+
+        for i_grid in range(grid_dim0):
+            for j_grid in range(grid_dim1):
+                for sx, sy in anchors_sizes[grid_idx]:
+                    cy = grid_size_dim0 / 2.0 + grid_size_dim0 * i_grid
+                    cx = grid_size_dim1 / 2.0 + grid_size_dim1 * j_grid
+                    box_w = grid_size_dim1 * sx
+                    box_h = grid_size_dim0 * sy
+
+                    x_min = cx - box_w / 2.0
+                    x_max = cx + box_w / 2.0
+                    y_min = cy - box_h / 2.0
+                    y_max = cy + box_h / 2.0
+
+                    if normalize:
+                        cx = cx / image_width
+                        cy = cy / image_height
+                        box_w = box_w / image_width
+                        box_h = box_h / image_height
+                        x_min = x_min / image_width
+                        x_max = x_max / image_width
+                        y_min = y_min / image_height
+                        y_max = y_max / image_height
+
+                    boxes_xyxy.append((x_min, y_min, x_max, y_max))
+                    boxes_xywh.append((x_min, y_min, box_w, box_h))
+                    boxes_cxcywh.append((cx, cy, box_w, box_h))
+        
+        grid_idx += 1
+
+    return boxes_xyxy, boxes_xywh, boxes_cxcywh
+    
+# generating prior boxes
+boxes_xyxy, boxes_xywh, boxes_cxcywh = create_default_boxes(
+    (300, 300), 
+    [ 
+        (38, 38),
+        (19, 19),
+        (10, 10),
+        (5, 5),
+        (3, 3),
+        (1, 1),
+    ],
+    [
+        [(1.0, 1.0), (2.0, 1.0), (1.0,2.0), (1.0, 1.0),],
+        [(1.0, 1.0), (2.0, 1.0), (3.0, 1.0), (1.0, 2.0), (1.0,3.0), (1.0, 1.0)],
+        [(1.0, 1.0), (2.0, 1.0), (3.0, 1.0), (1.0, 2.0), (1.0,3.0), (1.0, 1.0)],
+        [(1.0, 1.0), (2.0, 1.0), (3.0, 1.0), (1.0, 2.0), (1.0,3.0), (1.0, 1.0)],
+        [(1.0, 1.0), (2.0, 1.0), (1.0, 2.0), (1.0, 1.0),],
+        [(1.0, 1.0), (2.0, 1.0), (1.0, 2.0), (1.0, 1.0),],
+    ]
+)
+
+default_boxes_xyxy = np.array(boxes_xyxy)
+default_boxes_xywh = np.array(boxes_xywh)
