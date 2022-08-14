@@ -1,0 +1,72 @@
+def compute_loss(output_classes, target_classes, output_boxes, target_boxes, device):
+    
+    n_batch = output_classes.shape[0]
+    
+    alpha=1.0
+    gamma=3.0
+    
+    positive_loss = 0
+    negative_loss = 0
+    bbox_loss = 0
+    for i_batch in range(n_batch):
+        
+        positive_mask = target_classes[i_batch][:] > 0
+        negative_mask = target_classes[i_batch][:] == 0
+        print(torch.sum(positive_mask))
+
+        if torch.sum(positive_mask) > 0:
+            bbox_loss += F.smooth_l1_loss(output_boxes[i_batch][positive_mask], target_boxes[i_batch][positive_mask], reduction='mean')
+            
+            positive_loss += F.cross_entropy(output_classes[i_batch][positive_mask], target_classes[i_batch][positive_mask], ignore_index=255, reduction='mean', label_smoothing=0.0) / float(n_batch)
+            
+            # ce_loss = F.cross_entropy(output_classes[i_batch][positive_mask], target_classes[i_batch][positive_mask], ignore_index=255, reduction='none', label_smoothing=0.0) 
+            # pt = torch.exp(-ce_loss)
+            # focal_loss = alpha * (1-pt)**gamma * ce_loss
+            # positive_loss += focal_loss.mean() / float(n_batch)
+
+        if torch.sum(negative_mask) > 0:
+            negative_loss += F.cross_entropy(output_classes[i_batch][negative_mask], target_classes[i_batch][negative_mask], ignore_index=255, reduction='mean', label_smoothing=0.0) / float(n_batch)
+            
+            # ce_loss = F.cross_entropy(output_classes[i_batch][negative_mask], target_classes[i_batch][negative_mask], ignore_index=255, reduction='none', label_smoothing=0.0) 
+            # pt = torch.exp(-ce_loss)
+            # focal_loss = alpha * (1-pt)**gamma * ce_loss
+            # negative_loss += focal_loss.mean() / float(n_batch)
+
+    #print("\nbbox_loss:", bbox_loss.item() * 2)
+    #print("positive_loss:", positive_loss.item() * 2)
+    #print("negative_loss:", negative_loss.item() * 0.1)
+    return positive_loss * 2 + negative_loss * 0.1 + bbox_loss * 4
+
+
+def compute_loss2(output_classes, target_classes, output_boxes, target_boxes, device):
+    
+    output_classes = output_classes.view(-1, 3)
+    target_classes = target_classes.view(-1)
+    
+    output_boxes = output_boxes.view(-1, 4)
+    target_boxes = target_boxes.view(-1, 4)
+    
+    positive_loss = 0
+    negative_loss = 0
+    bbox_loss = 0
+        
+    positive_mask = target_classes > 0
+    negative_mask = target_classes == 0
+
+    if torch.sum(positive_mask) > 0:
+        bbox_loss = F.smooth_l1_loss(output_boxes, target_boxes, reduction='sum')
+        positive_loss = F.cross_entropy(output_classes, target_classes, ignore_index=255, reduction='sum', label_smoothing=0.0) 
+
+    if torch.sum(negative_mask) > 0:
+        negative_loss = F.cross_entropy(output_classes, target_classes, ignore_index=255, reduction='sum', label_smoothing=0.0) 
+
+    #print("\nbbox_loss:", bbox_loss.item() * 2)
+    #print("positive_loss:", positive_loss.item() * 2)
+    #print("negative_loss:", negative_loss.item() * 0.1)
+    return positive_loss * 2 + negative_loss * 0.1 + bbox_loss * 4
+
+
+
+# optimizer = optim.Adam(model.parameters(), lr=0.01)
+
+optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=0.001)
