@@ -1,0 +1,150 @@
+import numpy as np
+from typing import Tuple, Union
+
+
+def convert_xyxy_to_cxcywh(
+    x1: Union[int, float],
+    y1: Union[int, float],
+    x2: Union[int, float],
+    y2: Union[int, float]
+) -> Tuple[float, float, float, float]:
+    cx = (x1 + x2) / 2.0
+    cy = (y1 + y2) / 2.0
+    w = abs(x2 - x1)
+    h = abs(y2 - y1)
+    return cx, cy, w, h
+
+
+def convert_cxcywh_to_xyxy(
+    cx: Union[int, float],
+    cy: Union[int, float],
+    w: Union[int, float],
+    h: Union[int, float]
+) -> Tuple[float, float, float, float]:
+    x1 = cx - w / 2.0
+    y1 = cy - h / 2.0
+    x2 = cx + w / 2.0
+    y2 = cy + h / 2.0
+    return x1, y1, x2, y2
+
+
+def convert_xywh_to_xyxy(
+    x: Union[int, float],
+    y: Union[int, float],
+    w: Union[int, float],
+    h: Union[int, float]
+) -> Tuple[float, float, float, float]:
+    x1 = x
+    y1 = y
+    x2 = x + w
+    y2 = y + h
+    return x1, y1, x2, y2
+
+
+def convert_poly_to_yolobbox(
+    polygon: np.ndarray
+) -> Tuple[float, float, float, float]:
+    """polygon must be a Nx2 matrix
+    """
+    x1 = polygon[:, 0].min()
+    x2 = polygon[:, 0].max()
+    y1 = polygon[:, 1].min()
+    y2 = polygon[:, 1].max()
+    return convert_xyxy_to_cxcywh(x1, y1, x2, y2)
+
+
+def convert_yolo_to_xyxy(
+    cx: Union[int, float],
+    cy: Union[int, float],
+    w: Union[int, float],
+    h: Union[int, float],
+    img_w: Union[int, float],
+    img_h: Union[int, float]
+) -> Tuple[float, float, float, float]:
+    x1 = cx * img_w - (img_w * w) / 2.0
+    x2 = cx * img_w + (img_w * w) / 2.0
+    y1 = cy * img_h - (img_h * h) / 2.0
+    y2 = cy * img_h + (img_h * h) / 2.0
+    return x1, y1, x2, y2
+
+
+def convert_normalized_to_xyxy(
+    x1: Union[int, float],
+    y1: Union[int, float],
+    x2: Union[int, float],
+    y2: Union[int, float],
+    img_w: Union[int, float],
+    img_h: Union[int, float]
+) -> Tuple[float, float, float, float]:
+    x1 = x1 * img_w
+    x2 = x2 * img_w
+    y1 = y1 * img_h
+    y2 = y2 * img_h
+    return x1, y1, x2, y2
+
+
+def calc_iou(x1_min, x1_max, y1_min, y1_max, x2_min, x2_max, y2_min, y2_max):
+    i_min_x = max(x1_min, x2_min)
+    i_min_y = max(y1_min, y2_min)
+    i_max_x = min(x1_max, x2_max)
+    i_max_y = min(y1_max, y2_max)
+
+    inter_width = max((i_max_x - i_min_x), 0)
+    inter_height = max((i_max_y - i_min_y), 0)
+
+    width_box1 = abs(x1_max - x1_min)
+    height_box1 = abs(y1_max - y1_min)
+
+    width_box2 = abs(x2_max - x2_min)
+    height_box2 = abs(y2_max - y2_min)
+
+    area1 = width_box1 * height_box1
+    area2 = width_box2 * height_box2
+    intersection = (inter_width * inter_height)
+    union = area1 + area2 - intersection
+    iou = intersection / union
+
+    if iou < 0.0 or iou > 1.0:
+        iou = 0.0
+
+    return iou, i_min_x, i_min_y, i_max_x, i_max_y
+
+
+def np_calc_iou(
+    box_xyxy_gt: Tuple[float, float, float, float],
+    anchor_boxes_xyxy: np.ndarray,  # Nx4 boxes in XYXY
+) -> np.ndarray:
+    x2_min = anchor_boxes_xyxy[:, 0:1]
+    y2_min = anchor_boxes_xyxy[:, 1:2]
+    x2_max = anchor_boxes_xyxy[:, 2:3]
+    y2_max = anchor_boxes_xyxy[:, 3:4]
+
+    x1_min, y1_min, x1_max, y1_max = box_xyxy_gt
+    x1_min = np.ones_like(x2_min) * x1_min
+    y1_min = np.ones_like(x2_min) * y1_min
+    x1_max = np.ones_like(x2_min) * x1_max
+    y1_max = np.ones_like(x2_min) * y1_max
+
+    i_min_x = np.maximum(x1_min, x2_min)
+    i_min_y = np.maximum(y1_min, y2_min)
+    i_max_x = np.minimum(x1_max, x2_max)
+    i_max_y = np.minimum(y1_max, y2_max)
+
+    inter_width = np.clip((i_max_x - i_min_x), 0, None)
+    inter_height = np.clip((i_max_y - i_min_y), 0, None)
+
+    width_box1 = (x1_max - x1_min)
+    height_box1 = (y1_max - y1_min)
+
+    width_box2 = (x2_max - x2_min)
+    height_box2 = (y2_max - y2_min)
+
+    area1 = np.abs(width_box1 * height_box1)
+    area2 = np.abs(width_box2 * height_box2)
+    intersection = (inter_width * inter_height)
+    union = area1 + area2 - intersection
+    iou = intersection / union
+
+    iou[(iou < 0.0) | (iou > 1.0)] = 0.0
+
+    return iou[:, 0]  # , i_min_x, i_min_y, i_max_x, i_max_y
