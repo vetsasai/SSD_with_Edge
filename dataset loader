@@ -1,0 +1,157 @@
+import cv2
+import os
+
+import torch
+
+import numpy as np
+from tqdm import tqdm
+
+
+class DatasetYOLOFormat(torch.utils.data.Dataset):
+
+    def __init__(self, folder_path, transform=None):
+        self.folder_path = folder_path
+        self.transform = transform
+
+        self.classes = list()
+        self.bboxes = list()
+        self.images_path = list()
+
+        file_names = [file_name.replace(".txt", "") for file_name in sorted(
+            os.listdir(folder_path)) if file_name.endswith(".txt")]
+        for file_name in file_names:
+            bbox = list()
+            class_ids = list()
+            file_path = os.path.join(folder_path, file_name + ".txt")
+            with open(file_path, "r") as f:
+                lines = f.readlines()
+                for line in lines:
+                    line = line.strip()
+                    if len(line) == 0:
+                        continue
+
+                    data = [float(x) for x in line.split(" ") if len(line.replace(" ", "")) > 0]
+
+                    bbox.append(data[1:])
+                    class_ids.append([int(data[0])])
+
+            file_path = os.path.join(folder_path, file_name + ".jpg").replace(os.sep, "/")
+
+            self.bboxes.append(bbox)
+            self.classes.append(class_ids)
+            self.images_path.append(file_path)
+
+    def __len__(self) -> int:
+        return len(self.images_path)
+
+    def __getitem__(self, idx: int):
+        img = cv2.imread(self.images_path[idx])
+        bbox = self.bboxes[idx]
+        class_id = self.classes[idx]
+
+        return img, bbox, class_id
+
+
+# SSD Dataset
+
+def gen_training_data(default_boxes_xywh, default_boxes_xyxy, labels_id, boxes_gt_cxcywh):
+    output_offsets = np.zeros_like(default_boxes_xywh)
+    output_class_ids = np.zeros((output_offsets.shape[0], 1), dtype=np.uint8)
+
+    for class_id, box_gt_cxcywh in zip(labels_id, boxes_gt_cxcywh):
+        class_id = int(class_id[0]) + 1
+
+        cx, cy, bw, bh = box_gt_cxcywh[:]
+        bx, by, x1_max, y1_max = convert_cxcywh_to_xyxy(cx, cy, bw, bh)
+
+        iou = np_calc_iou((bx, by, x1_max, y1_max), default_boxes_xyxy)
+        mask_iou_high = iou > 0.9
+
+        if np.sum(mask_iou_high) > 0:
+            output_class_ids[mask_iou_high, 0] = class_id
+
+            Dx = default_boxes_xywh[mask_iou_high, 0]
+            Dy = default_boxes_xywh[mask_iou_high, 1]
+            Dw = default_boxes_xywh[mask_iou_high, 2]
+            Dh = default_boxes_xywh[mask_iou_high, 3]
+
+            # Bx, By, Bw, Bh
+            output_offsets[mask_iou_high, 0] = (bx - Dx) / Dw
+            output_offsets[mask_iou_high, 1] = (by - Dy) / Dh
+            output_offsets[mask_iou_high, 2] = np.log(bw / Dw)
+            output_offsets[mask_iou_high, 3] = np.log(bh / Dh)
+
+    return output_offsets, output_class_ids
+
+
+class DatasetSSDTrain(torch.utils.data.Dataset):
+
+    def __init__(self, folder_path_yolo_dataset, *,
+                 default_boxes_xywh: np.ndarray,
+                 default_boxes_xyxy: np.ndarray, transform=None):
+        super().__init__()
+
+        self.folder_path = folder_path_yolo_dataset
+        self.transform = transform
+
+        self.classes = list()
+        self.bboxes = list()
+        self.images_path = list()
+
+        file_names = [file_name.replace(".txt", "") for file_name in sorted(
+            os.listdir(self.folder_path)) if file_name.endswith(".txt")]
+        for file_name in file_names:
+            bbox = list()
+            class_ids = list()
+            file_path = os.path.join(self.folder_path, file_name + ".txt")
+            with open(file_path, "r") as f:
+                lines = f.readlines()
+                for line in lines:
+                    line = line.strip()
+                    if len(line) == 0:
+                        continue
+
+                    data = [float(x) for x in line.split(" ") if len(line.replace(" ", "")) > 0]
+
+                    bbox.append(data[1:])
+                    class_ids.append([int(data[0])])
+
+            file_path = os.path.join(self.folder_path, file_name + ".jpg").replace(os.sep, "/")
+
+            self.bboxes.append(bbox)
+            self.classes.append(class_ids)
+            self.images_path.append(file_path)
+
+        self.list_offsets = list()
+        self.list_classes = list()
+
+        for label_idx in tqdm(range(len(self.images_path))):
+
+            boxes_gt_cxcywh, labels_id = self.bboxes[label_idx], self.classes[label_idx]
+
+            output_offsets, output_class_ids = gen_training_data(
+                default_boxes_xywh, default_boxes_xyxy, labels_id, boxes_gt_cxcywh
+            )
+
+            self.list_offsets.append(output_offsets)
+            self.list_classes.append(output_class_ids)
+
+    def __len__(self) -> int:
+        # return 1
+        return len(self.images_path)
+
+    def __getitem__(self, idx: int):
+        img = cv2.imread(self.images_path[idx])
+
+        boxes = self.list_offsets[idx]
+        classes = self.list_classes[idx]
+
+        if self.transform is not None:
+            img = self.transform(img)
+            boxes = torch.from_numpy(boxes)
+            classes = torch.from_numpy(classes.reshape((-1,)))
+
+        return img, boxes, classes
+        
+        
+ 
