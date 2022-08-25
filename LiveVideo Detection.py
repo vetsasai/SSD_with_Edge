@@ -1,20 +1,9 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[ ]:
-
-
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import numpy as np
 import cv2
 import time
 
-# In[ ]:
-
-
-import cv2
-import numpy as np
 import os
 from tqdm import tqdm
 import torch
@@ -23,13 +12,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import transforms
 from PIL import Image
-import matplotlib.pyplot as plt
 
-
-# In[ ]:
-
-
-import numpy as np
 from typing import Tuple, Union
 
 
@@ -181,9 +164,6 @@ def np_calc_iou(
     return iou[:, 0]  # , i_min_x, i_min_y, i_max_x, i_max_y
 
 
-# In[ ]:
-
-
 from typing import List, Tuple
 
 def create_default_boxes(
@@ -237,10 +217,6 @@ def create_default_boxes(
 
     return boxes_xyxy, boxes_xywh, boxes_cxcywh
 
-
-# In[ ]:
-
-
 boxes_xyxy, boxes_xywh, boxes_cxcywh = create_default_boxes(
     (300, 300), 
     [ 
@@ -264,47 +240,19 @@ boxes_xyxy, boxes_xywh, boxes_cxcywh = create_default_boxes(
 default_boxes_xyxy = np.array(boxes_xyxy)
 default_boxes_xywh = np.array(boxes_xywh)
 
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
 model = torch.jit.load(".\model_scripted.pt")
 model.eval()
 
 
-# In[ ]:
-
-
 device=torch.device('cuda')
 model=model.to(device)
-
-
-# In[ ]:
-
-
-import torch
-from PIL import Image
-import torchvision.transforms as transforms
 
 transform = transforms.Compose([
     transforms.ToTensor()
 ])
 
 
-# In[ ]:
-
-
 # path=r"C:\Users\vetsa\Desktop\EdgeComputing_Project\CannyEdge\Nissan Versa_2011_Grey_01.mp4"
-
-
-# In[ ]:
-
 
 # vidcap = cv2.VideoCapture(path)
 vidcap=cv2.VideoCapture(0)  
